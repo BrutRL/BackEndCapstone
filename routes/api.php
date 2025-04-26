@@ -8,7 +8,7 @@ use App\Http\Controllers\RoomController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Facades\Artisan;
 
 
 Route::post("/register", [AuthController::class,"register"]);
@@ -44,13 +44,30 @@ Route::prefix("courses")->middleware("auth:api")->group(function () {
     Route::post('/restore/{courseId}', [courseController::class, 'restoreCourse']);
 });
 
-Route::prefix("rooms")->group(function () {
+/*Route::prefix("rooms")->group(function () {
    Route::post("/", [RoomController::class, "store"])->middleware("auth:api");
    Route::get("/", [RoomController::class, "index"]);
    Route::get("/{room}", [RoomController::class, "show"]);
    Route::patch("/{room}", [RoomController::class, "update"])->middleware("auth:api");
    Route::delete("/{room}", [RoomController::class, "destroy"])->middleware("auth:api");
     Route::post('/{room}/archive', [RoomController::class, 'archiveRoom']);
+}); */
+
+Route::prefix("rooms")->group(function () {
+    Route::post("/", [RoomController::class, "store"])->middleware("auth:api");
+    Route::get("/", [RoomController::class, "index"]);
+    Route::get("/{room}", [RoomController::class, "show"]);
+    Route::patch("/{room}", [RoomController::class, "update"])->middleware("auth:api");
+    Route::delete("/{room}", [RoomController::class, "destroy"])->middleware("auth:api");
+    Route::post('/{room}/archive', [RoomController::class, 'archiveRoom']);
+
+    Route::post('/update-status', function () {
+        $exitCode = Artisan::call('edit:room-status');
+        return response()->json([
+            'message' => 'Room status update triggered.',
+            'exit_code' => $exitCode
+        ]);
+    });
 });
 
 Route::prefix("schedules")->middleware("auth:api")->group(function () {

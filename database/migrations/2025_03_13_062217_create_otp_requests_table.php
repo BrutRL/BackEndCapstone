@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('room_id');    // Foreign key to rooms table
             $table->unsignedBigInteger('user_id');    // Foreign key to users table
             $table->integer('Access_code')->unique()->nullable();     // The generated OTP code
-            $table->enum('otp_status', ['1', '2', '3'])->default('2'); // OTP status
+            $table->enum('access_status', ['1', '2', '3'])->default('2'); // OTP status
             $table->datetime('generated_at')->useCurrent(); // Timestamp when the OTP was generated
             $table->time('used_at')->nullable(); // Timestamp when the OTP was used
             $table->time("end_time"); //When the session ends

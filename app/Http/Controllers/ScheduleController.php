@@ -40,51 +40,42 @@ class ScheduleController extends Controller
         }
     
         $validated = $validator->validated();
-    
-        // Check for schedule conflicts
-        $conflict = Schedule::where('room_id', $validated['room_id'])
-            ->where(function ($query) use ($validated) {
-                $query->where(function ($subQuery) use ($validated) {
-                    $subQuery->where('start_time', '<', $validated['end_time'])
-                             ->where('end_time', '>', $validated['start_time']);
-                })
-                ->where(function ($subQuery) use ($validated) {
-                    $subQuery->where('assigned_date', '<=', $validated['end_date'])
-                             ->where('end_date', '>=', $validated['assigned_date']);
-                });
-            })
-            ->where(function ($query) use ($validated) {
-                foreach ($validated['days_in_week'] as $day) {
-                    $dayAsJson = json_encode((string) $day);
-                    $query->orWhereRaw("JSON_CONTAINS(days_in_week, ?)", [$dayAsJson]);
-                }
-            })
-            ->exists();
-    
-        if ($conflict) {
-            return $this->errorResponse("Conflict: The room is already booked at the selected time.", [], 409);
-        }
-    
-        $schedule = Schedule::create([
-            "room_id" => $validated["room_id"],
-            "user_id" => $validated["user_id"],
-            "course_id" => $validated["course_id"],
-            "assigned_date" => $validated["assigned_date"],
-            "end_date" => $validated["end_date"],
-            "start_time" => $validated["start_time"],
-            "end_time" => $validated["end_time"],
-            "days_in_week" => json_encode($validated["days_in_week"]),
-            "year" => $validated["year"],
-            "status" => 1, // Always set to Pending (2) by default
-        ]);
+    $overlappingschedule = Schedule::where('room_id', $validated['room_id'])
+        ->where(function ($query) use ($validated) {
+            $query->where(function ($q) use ($validated) {
+                $q->where('start_time', '<', $validated['end_time'])
+                  ->where('end_time', '>', $validated['start_time']);
+            });
+        })->first();
 
+    if ($overlappingschedule) {
+        return response()->json([
+            'ok' => false,
+            'message' => 'This time slot is already taken for the selected room.',
+        ], 409); // Conflict
+    }
+    
+    $schedule = Schedule::create([
+        "room_id" => $validated["room_id"],
+        "user_id" => $validated["user_id"],
+        "course_id" => $validated["course_id"],
+        "assigned_date" => $validated["assigned_date"],
+        "end_date" => $validated["end_date"],
+        "start_time" => Carbon::createFromFormat('H:i', $validated["start_time"])->format('H:i'), 
+        "end_time" => Carbon::createFromFormat('H:i', $validated["end_time"])->format('H:i'),
+        "days_in_week" => json_encode($validated["days_in_week"]),
+        "year" => $validated["year"],
+        "status" => 2, // 1 = Accepted, 2 = Pending, 3 = Cancelled
+    ]);
+    
+        
         LoginHistory::create([
-            'user_id' => auth()->id(), // The currently authenticated user
+            'user_id' => auth()->id(),
             'username' => auth()->user()->username,
-            'role' => auth()->user()->role_id, // Log the role of the authenticated user
+            'role' => auth()->user()->role_id, 
             'event' => 'schedule',
-            'action' => 'create', // Action type
-           ]);
+            'action' => 'create', 
+        ]);
     
         return $this->successResponse($schedule, "Schedule created successfully!", 201);
     }
@@ -130,11 +121,11 @@ class ScheduleController extends Controller
     }
 
     LoginHistory::create([
-        'user_id' => auth()->id(), // The currently authenticated user
+        'user_id' => auth()->id(),
         'username' => auth()->user()->username,
-        'role' => auth()->user()->role_id, // Log the role of the authenticated user
+        'role' => auth()->user()->role_id, 
         'event' => 'schedule',
-        'action' => 'update', // Action type
+        'action' => 'update', 
        ]);
     
     $schedule->update($validator->validated());

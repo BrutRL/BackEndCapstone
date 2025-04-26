@@ -43,7 +43,7 @@ class CourseController extends Controller
         return response()->json([
             "ok" => true,
             "data" => $course,
-            "message" => "Course has been created and assigned to the user."
+            "message" => "Course has been Created."
         ], 201);
     }
 

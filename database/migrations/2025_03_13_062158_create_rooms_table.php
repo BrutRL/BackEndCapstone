@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('rooms', function (Blueprint $table) {
             $table->bigIncrements('id')->unsigned();
             $table->unsignedBigInteger('user_id')->nullable();
-            $table->string('name');
+            $table->string('name')->unique();
             $table->integer('capacity');
             $table->enum('status', ['Available', 'Occupied', 'Pending'])->default('Available'); // Fixed typo here 1 = available | 2 = occupied | 3 = pending
             $table->string('location');

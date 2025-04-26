@@ -17,8 +17,8 @@ class Otp_request extends Model
     protected $fillable = [
         'room_id',
         'user_id',
-        'Access_code',
-        'otp_status',
+        'Access_code',  // ito ang nabago dating otp_code
+        'access_status',
         'generated_at',
         'used_at',
         'end_time',

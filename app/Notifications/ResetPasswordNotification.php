@@ -44,7 +44,7 @@ class ResetPasswordNotification extends Notification
             ->subject('Reset Password Notification')
             ->line('You are receiving this email because we received a password reset request for your account.')
             ->line('Your username: ' . $this->username)
-            ->action('Reset Password', 'http://localhost:5173/reset-password?token=' . $this->token . '&username=' . $this->username)
+            ->action('Reset Password', 'http://localhost:5173/reset_password?token=' . $this->token . '&username=' . $this->username)
             ->line('If you did not request a password reset, no further action is required.');
     }
 

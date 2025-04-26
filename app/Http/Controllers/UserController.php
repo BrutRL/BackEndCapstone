@@ -16,16 +16,16 @@ class UserController extends Controller
 */
      public function store (Request $request){
         $validator = Validator::make($request->all(), [
-            "username" => [ "required","unique:users","min:4","regex:/^[a-zA-Z0-9._-]+$/",],
-            "email" => "required|unique:users|email",
+            "username" => ["required", "unique:users", "min:4", "max:64", "regex:/^[a-zA-Z][a-zA-Z0-9]*$/"], // Alphanumeric, starts with a letter
+            "email" => "required|unique:users|email|max:64",
             "password" => "required|string|min:8|confirmed",
             "role_id" => "nullable|sometimes|in:Admin,user",
-            "first_name" => "required|string|min:2",
-            "middle_name" => "nullable|sometimes|string|min:2",
-            "last_name" => "required|string|min:2",
+            "first_name" => ["required", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
+            "middle_name" => ["nullable", "sometimes", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
+            "last_name" => ["required", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
             "birth_date" => "required|date|before:tomorrow",
             'gender' => ['required', Rule::in(['Male', 'Female', 'Others'])],
-            "contact_number" => ["required", "string", "min:11", "regex:/^(09|\+639)\d{9}$/", "not_regex:/[a-zA-Z]/" ], // Matches valid Philippine contact numbers.
+            "contact_number" => ["required", "string", "min:11", "regex:/^(09|\+639)\d{9}$/", "not_regex:/[a-zA-Z]/"], // Matches valid Philippine contact numbers
             'department' => ['required', Rule::in(['CIT', 'COE', 'OTHERS'])],
         ]);
         if ($validator->fails()){
@@ -95,16 +95,16 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validator = Validator::make($request->all(), [
-            "username" => ["sometimes", "unique:users,username," . $user->id, "min:4", "regex:/^[a-zA-Z0-9._-]+$/"],
+            "username" => ["sometimes", "unique:users,username," . $user->id, "min:4", "max:64", "regex:/^[a-zA-Z][a-zA-Z0-9]*$/"], // Alphanumeric, starts with a letter
             "email" => "sometimes|email|unique:users,email," . $user->id,
             "password" => "sometimes|string|min:8|confirmed",
             "role_id" => "nullable|sometimes|in:Admin,user",
-            "first_name" => "sometimes|string|min:2",
-            "middle_name" => "nullable|sometimes|string|min:2",
-            "last_name" => "sometimes|string|min:2",
+            "first_name" => ["sometimes", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
+            "middle_name" => ["nullable", "sometimes", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
+            "last_name" => ["sometimes", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
             "birth_date" => "sometimes|date|before:tomorrow",
             'gender' => ['sometimes', Rule::in(['Male', 'Female', 'Others'])],
-            "contact_number" => ["sometimes", "string", "min:11", "regex:/^(09|\+639)\d{9}$/"], 
+            "contact_number" => ["sometimes", "string", "min:11", "regex:/^(09|\+639)\d{9}$/"], // Matches valid Philippine contact numbers
             "department" => ["sometimes", Rule::in(["CIT", "COE", "OTHERS"])],
         ]);
     

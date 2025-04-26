@@ -1,15 +1,14 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\Otp_request;
 use Validator;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class Otp_requestController extends Controller
 {
-
- /**
+    /**
      * Creates an Otp_request to inputs from Request
      * POST:: /api/otp_request
      * @param Request
@@ -17,60 +16,55 @@ class Otp_requestController extends Controller
      */
     public function store(Request $request)
     {
-        //$user = $request->user(); // Authenticated user
-
         $validator = Validator::make($request->all(), [
             'room_id' => 'required|exists:rooms,id',
-            "user_id" => "required|exists:users,id",
-            'Access_code' => 'sometimes|string|regex:/^\d{6}$/', // Ensure Access_code is exactly 6 digits
-            'otp_status' => 'required|in:1,2,3',
-            "generated_at" => "required|date",
-            'used_at' => "required|date_format:H:i",
-            "end_time" => "required|date_format:H:i|after:used_at",
-            "purpose" => "required|string|min:4|max:255",
+            'user_id' => 'required|exists:users,id',
+            'Access_code' => 'sometimes|string|regex:/^\d{6}$/',
+            'generated_at' => 'required|date',
+            'used_at' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:used_at',
+            'purpose' => 'required|string|max:255',
         ]);
-
         if ($validator->fails()) {
             return response()->json([
                 'ok' => false,
                 'message' => "Validation failed!",
-                'error' => $validator->errors()
+                'errors' => $validator->errors()
             ], 400);
         }
 
         $validated = $validator->validated();
+        $existingAcceptedRequest = Otp_request::where('room_id', $validated['room_id'])
+            ->whereDate('generated_at', Carbon::parse($validated['generated_at'])->toDateString())
+            ->where('access_status', 1)
+            ->where(function ($query) use ($validated) {
+                $query->where('used_at', '<', $validated['end_time'])
+                    ->where('end_time', '>', $validated['used_at']);
+            })
+            ->exists();
 
-        $Otp_request = Otp_request::create([
-           "room_id" => $validated["room_id"],
-           "Access_code" => $validated["Access_code"] ?? null,
-           "otp_status" => $validated["otp_status"] ?? 3,
-           "generated_at" => $validated["generated_at"],
-           "user_id" => $validated["user_id"],
-           "used_at" => $validated["used_at"],
-           "end_time" => $validated["end_time"],
-           "purpose" => $validated["purpose"],
+        if ($existingAcceptedRequest) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'This room already has an accepted request for this date and time.',
+            ], 409);
+        }
+        $otpRequest = Otp_request::create([
+            'room_id' => $validated['room_id'],
+            'user_id' => $validated['user_id'],
+            'Access_code' => $validated['Access_code'] ?? null,
+            'access_status' => 2,
+            'generated_at' => $validated['generated_at'],
+            'used_at' => $validated['used_at'],
+            'end_time' => $validated['end_time'],
+            'purpose' => $validated['purpose'],
         ]);
         return response()->json([
-            "ok" => true,
-            "data" => $Otp_request,
-            "message" => "Opt Request has been created and assigned to the user."
+            'ok' => true,
+            'data' => $otpRequest,
+            'message' => 'Your request Room is Successfully Created, Wait for Admin Approval.',
         ], 201);
     }
-
-/*
-        // Check if the authenticated user is an admin
-        $isAdmin = $user->role == 'Admin';
-
-        // Set the otp_status based on the user's role
-        $otpStatus = $isAdmin ? 1 : 2; // 1 for admin (accepted), 2 for user (pending)
-
-        $OtpRequest = Otp_request::create(array_merge(
-            $validator->validated(),
-            [
-                'otp_status' => $otpStatus // Set the otp_status based on the user's role
-            ]
-        ));
-    */
 
     /**
      * Retrieve all otp_requests from Request
@@ -80,15 +74,11 @@ class Otp_requestController extends Controller
      */
     public function index()
     {
-        // Include otp_code and used_at in the select statement
-        $OtpRequests = Otp_request::select('id', 'room_id', 'user_id', 'Access_code', 'otp_status', 'generated_at','used_at', 'end_time', 'purpose')
-            ->with(['room', 'user']) // Eager load related models if needed
-            ->get();
-
+        $OtpRequests = Otp_request::with(['room', 'user'])->get();
         return response()->json([
             "ok" => true,
             "data" => $OtpRequests,
-            "message" => "OTP requests have been retrieved successfully."
+            "message" => "All Rooms has been retrieved successfully."
         ], 200);
     }
 
@@ -103,7 +93,7 @@ class Otp_requestController extends Controller
     {
         return response()->json([
             'ok' => true,
-            'message' => 'OTP request details retrieved successfully.',
+            'message' => 'Room request details retrieved successfully.',
             'data' => $OtpRequest
         ], 200);
     }
@@ -115,34 +105,85 @@ class Otp_requestController extends Controller
      * @param Otp_request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Otp_request $OtpRequest)
+    public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            "room_id" => "sometimes|exists:rooms,id",
-            "otp_status" => "sometimes|in:1,2,3",
-            "Access_code" => "sometimes|string|regex:/^\d{6}$/",
-            "generated_at" => "sometimes|date",
-            'used_at' => "sometimes|date_format:H:i",
-            "end_time" => "sometimes|date_format:H:i|after:used_at",
-            "purpose" => "sometimes|string|min:4",
+            'access_status' => 'sometimes|in:1,2',
+            'room_id' => 'sometimes|exists:rooms,id',
+            'user_id' => 'sometimes|exists:users,id',
+            'Access_code' => 'sometimes|string|regex:/^\d{6}$/',
+            'generated_at' => 'sometimes|date',
+            'used_at' => 'sometimes|date_format:H:i',
+            'end_time' => 'sometimes|date_format:H:i|after:used_at',
+            'purpose' => 'sometimes|string|max:255',
         ]);
-
         if ($validator->fails()) {
             return response()->json([
-                "ok" => false,
-                "message" => "Validation failed!",
-                "errors" => $validator->errors()
+                'ok' => false,
+                'message' => "Validation failed!",
+                'errors' => $validator->errors()
             ], 400);
         }
-
-        $OtpRequest->update($validator->validated());
-
+    
+        $otpRequest = Otp_request::find($id);
+        if (!$otpRequest) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'OTP request not found!',
+            ], 404);
+        }
+    
+        $otpRequest->fill($request->only([
+            'room_id', 'user_id', 'generated_at', 'used_at', 'end_time', 'purpose'
+        ]));
+    
+        if ($request->access_status == 1) {
+            $existingAcceptedRequest = Otp_request::where('room_id', $otpRequest->room_id)
+                ->where(function ($query) use ($otpRequest) {
+                    $query->where('used_at', '<', $otpRequest->end_time)
+                          ->where('end_time', '>', $otpRequest->used_at);
+                })
+                ->where('access_status', 1)
+                ->first();
+    
+            if ($existingAcceptedRequest) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'This time slot is already taken by an accepted request.',
+                ], 409);
+            }
+    
+            $otpRequest->access_status = 1;
+            if ($otpRequest->room->name === 'R404') {
+                if ($request->has('Access_code')) {
+                    $otpRequest->Access_code = $request->Access_code;
+                } else {
+                    $otpRequest->Access_code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                }
+            }
+    
+            Otp_request::where('room_id', $otpRequest->room_id)
+                ->whereDate('generated_at', Carbon::parse($otpRequest->generated_at)->toDateString())
+                ->where('access_status', 2)
+                ->where(function ($query) use ($otpRequest) {
+                    $query->where('used_at', '<', $otpRequest->end_time)
+                          ->where('end_time', '>', $otpRequest->used_at);
+                })
+                ->update(['access_status' => 3]);
+        }
+        if ($request->has('Access_code') && preg_match('/^\d{6}$/', $request->Access_code)) {
+            $otpRequest->Access_code = $request->Access_code;
+        }
+    
+        $otpRequest->save();
+    
         return response()->json([
-            "ok" => true,
-            "message" => "OTP request updated successfully.",
-            "data" => $OtpRequest
+            'ok' => true,
+            'data' => $otpRequest,
+            'message' => 'OTP request updated successfully.',
         ], 200);
     }
+    
 
     /**
      * Delete specific Otp_request using id from URI
@@ -156,7 +197,7 @@ class Otp_requestController extends Controller
         $OtpRequest->delete();
         return response()->json([
             "ok" => true,
-            "message" => "Otp Request has been Deleted!."
+            "message" => "Request Room has been Deleted!."
         ], 201);
     }
 }

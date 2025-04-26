@@ -8,6 +8,7 @@ use App\Models\LoginHistory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rule;
 use Validator;
 
 class AuthController extends Controller
@@ -20,17 +21,17 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            "username" => ["required", "unique:users", "min:4", "regex:/^[a-zA-Z0-9._-]+$/"],
-            "email" => "required|unique:users|email",
+            "username" => ["required", "unique:users", "min:4", "max:64", "regex:/^[a-zA-Z][a-zA-Z0-9]*$/"], // Alphanumeric, starts with a letter
+            "email" => "required|unique:users|email|max:64",
             "password" => "required|string|min:8|confirmed",
             "role_id" => "nullable|sometimes|in:Admin,user",
-            "first_name" => "required|string|min:2",
-            "middle_name" => "nullable|sometimes|string|min:2",
-            "last_name" => "required|string|min:2",
+            "first_name" => ["required", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
+            "middle_name" => ["nullable", "sometimes", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
+            "last_name" => ["required", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
             "birth_date" => "required|date|before:tomorrow",
-            "gender" => "required|string|in:Male,Female,Prefer not to say",
-            "contact_number" => ["required", "string", "min:11", "regex:/^(09|\+639)\d{9}$/", "not_regex:/[a-zA-Z]/" ], // Matches valid Philippine contact numbers.
-            "department" => "required|string|in:CIT,COE,OTHERS",
+            'gender' => ['required', Rule::in(['Male', 'Female', 'Others'])],
+            "contact_number" => ["required", "string", "min:11", "regex:/^(09|\+639)\d{9}$/", "not_regex:/[a-zA-Z]/"], // Matches valid Philippine contact numbers
+            'department' => ['required', Rule::in(['CIT', 'COE', 'OTHERS'])],
         ]);
 
         if ($validator->fails()) {
@@ -67,7 +68,7 @@ class AuthController extends Controller
             filter_var($validated["username"], FILTER_VALIDATE_EMAIL) ? "email" : "username" => $validated["username"],
             "password" => $validated['password']
         ])) {
-            return $this->Unauthorized("Invalid Credentials!");
+            return $this->Unauthorized("Invalid Credentials! Please check Username or Password.");
         }
 
         $user = auth()->user();
@@ -86,7 +87,7 @@ class AuthController extends Controller
         return $this->Ok([
             "user" => $user,
             "token" => $token,
-        ], "Logged in Success!");
+        ], "Logged in Successfully!");
     }
 
     /**

@@ -6,7 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Room extends Model
 {
-    protected $guarded = []; // opposite of protected fillable
+  //  protected $guarded = []; // opposite of protected fillable
+
+  protected $fillable = [
+    'name',
+    'capacity',
+    'status',
+    'user_id',
+    'location',
+    'extension',
+    'description'
+];
 
     public function user(){
         return $this->belongsTo(User::class);

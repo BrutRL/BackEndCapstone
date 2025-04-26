@@ -18,8 +18,8 @@ return new class extends Migration
             $table->string("last_name",32);
             $table->date("birth_date")->nullable();
             $table->enum("gender", ["Male", "Female","Others"]);
-            $table->string("contact_number");
-            $table->enum("department", ["CIT", "COE", "OTHERS"]);
+            $table->string("contact_number"); //ito ay gagawing unique
+            $table->enum("department", ["CIT", "COE", "ADMIN"]);
             $table->timestamp('deleted_at')->nullable();
             $table->timestamps();
 

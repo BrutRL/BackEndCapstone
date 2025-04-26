@@ -20,13 +20,24 @@ class RoomController extends Controller
     {
         // Validate the request
         $validator = Validator::make($request->all(), [
-            //"user_id" => "nullable|exists:users,id",
-            "name" => "required|unique:rooms,name|min:2|string",
-            "capacity" => "required|integer|min:1",
+            "user_id" => "nullable|exists:users,id",
+            "name" => ["required", "string", "min:2","regex:/^[A-Z][a-zA-Z0-9]*$/","unique:rooms,name"],
+            "capacity" => "required|integer|min:1|max:50",
             "status" => "sometimes|integer|min:1",
             "location" => "required|string|min:8|max:255",
             'image' => "required|image|mimes:jpeg,jpg,png|max:32000" // Ensure the image is required and valid
+        ], [
+            // Custom error message for duplicate room name
+            "name.unique" => "The room name already exists. Please choose a different name."
         ]);
+    
+        if ($validator->fails()) {
+            return response()->json([
+                'ok' => false,
+                'message' => "Request didn't pass the validation!",
+                'errors' => $validator->errors()
+            ], 400);
+        }
 
         if ($validator->fails()) {
             return response()->json([
@@ -111,7 +122,7 @@ class RoomController extends Controller
         // Validate the request
         $validator = Validator::make($request->all(), [
             //"user_id" => "nullable|exists:users,id",
-            "name" => "sometimes|unique:rooms,name," . $room->id . "|min:2|string",
+            "name" => ["sometimes", "string", "min:2", "regex:/^[A-Z][a-zA-Z0-9]*$/", "unique:rooms,name," . $room->id], // Updated regex
             "capacity" => "sometimes|integer|min:1",
             "status" => "sometimes|in:1,2,3",
             "location" => "sometimes|string|min:8|max:255",
