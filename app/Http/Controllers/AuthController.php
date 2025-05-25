@@ -68,7 +68,7 @@ class AuthController extends Controller
             filter_var($validated["username"], FILTER_VALIDATE_EMAIL) ? "email" : "username" => $validated["username"],
             "password" => $validated['password']
         ])) {
-            return $this->Unauthorized("Invalid Credentials! Please check Username or Password.");
+            return $this->Unauthorized("Invalid Credentials!");
         }
 
         $user = auth()->user();
@@ -87,7 +87,7 @@ class AuthController extends Controller
         return $this->Ok([
             "user" => $user,
             "token" => $token,
-        ], "Logged in Successfully!");
+        ], "Logged in Success!");
     }
 
     /**
@@ -110,13 +110,19 @@ class AuthController extends Controller
      * @return \Illuminate\Http\JsonResponse
      */
     public function getLoginHistory(Request $request)
-    {
-        $user = Auth::user();
-        $user->profile;
-        $history = LoginHistory::where('user_id', $user->id)->get();
+{
+    $user = $request->user();
+    $user->profile;
 
-        return $this->Ok($history, "Login/Logout history retrieved successfully");
+    // If admin, show all logs; if user, show only their logs
+    if ($user->role_id === 'Admin') {
+        $history = LoginHistory::all();
+    } else {
+        $history = LoginHistory::where('user_id', $user->id)->get();
     }
+
+    return $this->Ok($history, "Login/Logout history retrieved successfully");
+}
 
     /**
      * Logout the authenticated user
@@ -125,7 +131,7 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
 {
-    $user = Auth::user();
+    $user = $request->user(); // <-- ito ang gamitin
 
     if (!$user) {
         return $this->Unauthorized("Invalid Token!");
@@ -135,7 +141,7 @@ class AuthController extends Controller
     LoginHistory::create([
         'user_id' => $user->id,
         'username' => $user->username,
-        'role' => auth()->user()->role_id,
+        'role' => $user->role_id,
         'event' => 'logout',
     ]);
 

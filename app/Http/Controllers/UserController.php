@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LoginHistory;
 use Illuminate\Http\Request;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Validation\Rule;
 use Validator;
 class UserController extends Controller
@@ -23,10 +24,14 @@ class UserController extends Controller
             "first_name" => ["required", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
             "middle_name" => ["nullable", "sometimes", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
             "last_name" => ["required", "string", "min:2", "max:32", "regex:/^[A-Z][a-zA-Z]*$/"], // Starts with a capital letter
-            "birth_date" => "required|date|before:tomorrow",
+            'birth_date' => ['required', 'date', function ($attribute, $value, $fail) {
+            if (Carbon::parse($value)->age < 2) {
+                $fail('You must be at least 22 years old.');
+            }
+        }],
             'gender' => ['required', Rule::in(['Male', 'Female', 'Others'])],
             "contact_number" => ["required", "string", "min:11", "regex:/^(09|\+639)\d{9}$/", "not_regex:/[a-zA-Z]/"], // Matches valid Philippine contact numbers
-            'department' => ['required', Rule::in(['CIT', 'COE', 'OTHERS'])],
+            'department' => ['required', Rule::in(['CIT', 'COE', 'ADMIN'])],
         ]);
         if ($validator->fails()){
             return $this->BadRequest($validator);
@@ -105,7 +110,7 @@ class UserController extends Controller
             "birth_date" => "sometimes|date|before:tomorrow",
             'gender' => ['sometimes', Rule::in(['Male', 'Female', 'Others'])],
             "contact_number" => ["sometimes", "string", "min:11", "regex:/^(09|\+639)\d{9}$/"], // Matches valid Philippine contact numbers
-            "department" => ["sometimes", Rule::in(["CIT", "COE", "OTHERS"])],
+            "department" => ["sometimes", Rule::in(["CIT", "COE", "ADMIN"])],
         ]);
     
         if ($validator->fails()) {

@@ -3,9 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
-use App\Models\Schedule;
-use App\Models\Archive;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Validator;
 
@@ -19,9 +16,9 @@ class CourseController extends Controller
      */
     public function store(Request $request){
         $validator = Validator::make($request->all(), [
-            "name" => "required|string|min:4|max:32",
-            "code" => "required|min:2",
-            "credit_unit" => "required|integer|min:1",
+            "name" => "required|string|min:4|max:100",
+            "code" => "required|min:2|max:20",
+            "credit_unit" => "required|integer|min:1|max:10",
             "description" => "required|string|min:4",
         ]);
 
@@ -83,9 +80,9 @@ class CourseController extends Controller
      */
     public function update(Request $request, Course $course){
         $validator = Validator::make($request->all(), [
-            "name" => "sometimes|string|min:4|max:32",
-            "code" => "sometimes|min:2",
-            "credit_unit" => "sometimes|integer|min:1",
+            "name" => "sometimes|string|min:4|max:100",
+            "code" => "sometimes|min:2|max:20",
+            "credit_unit" => "sometimes|integer|min:1|max:10",
             "description" => "sometimes|string|min:4",
         ]);
 

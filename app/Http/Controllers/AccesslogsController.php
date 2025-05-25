@@ -10,8 +10,8 @@ class AccessLogsController extends Controller
 {
 
 /*
-    * Creates accesslog to inputs from Request
-    *POST:: /api/AccessLog
+    * Creates AccessLogs to inputs from Request
+    *POST:: /api/AccessLogs
     * @param Request
     *@param AccessLog
     * @return \Illuminate\Http\Response
@@ -62,19 +62,22 @@ class AccessLogsController extends Controller
     }
 
 /**
- * Retrive all Accesslog from Request
+ * Retrive all AccessLogs from Request
  * GET: /api/accessLog/{accessLog}
  * @param Request
  * @param AccessLog
  * @return \Illuminate\Http\Response
  */
-    public function index (){
-        return response()->json([
-            "ok" => true,
-            "data" => AccessLog::all(),
-            "message" => "AccessLog has been Retrieved!."
-        ],201);
-    }
+public function index()
+{
+    $accessLogs = AccessLog::with(['room', 'user.profile', 'otpRequest'])->get();
+
+    return response()->json([
+        "ok" => true,
+        "data" => $accessLogs,
+        "message" => "Access logs have been retrieved successfully.",
+    ], 200);
+}
 /**
 * Retrive specific AccessLog using id
 * GET: /api/AccessLog/{AccessLog}
@@ -82,17 +85,18 @@ class AccessLogsController extends Controller
 * @param  AccessLog
 * @return \Illuminate\Http\Response
 */
-    public function show(Request $request, AccessLog $accessLog){
-        $accessLog;
-        return response()->json([
-            'ok'=> true,
-            'message' => 'AccessLog Info has been Retrieved',
-            'data' => $accessLog
-        ],200);
-    } 
+public function show(Request $request, AccessLog $accessLog)
+{
+    $accessLog->load(['room', 'user', 'otp_request']);
 
-/**  Update specific schedule using inputs from Request and id from URI
- * PATCH: /api/schedules/{schedule}
+    return response()->json([
+        'ok' => true,
+        'message' => 'Access log details have been retrieved successfully.',
+        'data' => $accessLog,
+    ], 200);
+}
+/**  Update specific AccessLogs using inputs from Request and id from URI
+ * PATCH: /api/access_log/{access_log}
  * @param Request
  * @param AccessLog
  * @return \Illuminate\Http\Response

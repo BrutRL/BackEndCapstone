@@ -43,4 +43,9 @@ class Otp_request extends Model
     public function course () {
         return $this->belongsTo(Course::class);
     }
+
+    public function accessLog()
+    {
+        return $this->hasOne(Accesslog::class);
+    }
 }

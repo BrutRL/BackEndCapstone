@@ -41,6 +41,6 @@ class Accesslog extends Model
     // An AccessLog may belong to an OTPRequest (nullable)
     public function otpRequest()
     {
-        return $this->belongsTo(Otp_request::class, 'otp_request_id');
+        return $this->belongsTo(Otp_request::class);
     }
 }

@@ -31,8 +31,8 @@ class ScheduleController extends Controller
             "start_time" => "required|date_format:H:i",
             "end_time" => "required|date_format:H:i|after:start_time",
             "days_in_week" => "required|array|min:1",
+            "days_in_week.*" => "integer|min:1|max:7",
             "year" => "required|string|min:1|max:32",
-            "days_in_week.*" => "integer|min:0|max:6",
         ]);
     
         if ($validator->fails()) {
@@ -40,54 +40,104 @@ class ScheduleController extends Controller
         }
     
         $validated = $validator->validated();
-    $overlappingschedule = Schedule::where('room_id', $validated['room_id'])
-        ->where(function ($query) use ($validated) {
-            $query->where(function ($q) use ($validated) {
-                $q->where('start_time', '<', $validated['end_time'])
-                  ->where('end_time', '>', $validated['start_time']);
-            });
-        })->first();
-
-    if ($overlappingschedule) {
-        return response()->json([
-            'ok' => false,
-            'message' => 'This time slot is already taken for the selected room.',
-        ], 409); // Conflict
-    }
     
-    $schedule = Schedule::create([
-        "room_id" => $validated["room_id"],
-        "user_id" => $validated["user_id"],
-        "course_id" => $validated["course_id"],
-        "assigned_date" => $validated["assigned_date"],
-        "end_date" => $validated["end_date"],
-        "start_time" => Carbon::createFromFormat('H:i', $validated["start_time"])->format('H:i'), 
-        "end_time" => Carbon::createFromFormat('H:i', $validated["end_time"])->format('H:i'),
-        "days_in_week" => json_encode($validated["days_in_week"]),
-        "year" => $validated["year"],
-        "status" => 2, // 1 = Accepted, 2 = Pending, 3 = Cancelled
-    ]);
+        $startDate = Carbon::parse($validated['assigned_date']);
+        $endDate = Carbon::parse($validated['end_date']);
+        $daysInWeek = $validated['days_in_week'];
     
-        
+        $dateContainsValidDay = false;
+        $dateRange = clone $startDate;
+    
+        while ($dateRange->lte($endDate)) {
+            if (in_array($dateRange->dayOfWeekIso, $daysInWeek)) {
+                $dateContainsValidDay = true;
+                break;
+            }
+            $dateRange->addDay();
+        }
+    
+        if (!$dateContainsValidDay) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'The date range must include at least one of the selected days of the week.',
+            ], 422);
+        }
+    
+        // Check for overlapping schedules
+        $overlappingschedule = Schedule::where('room_id', $validated['room_id'])
+            ->where(function ($query) use ($validated) {
+                $query->where(function ($q) use ($validated) {
+                    $q->where('start_time', '<', $validated['end_time'])
+                        ->where('end_time', '>', $validated['start_time']);
+                });
+            })
+            ->where(function ($query) use ($validated) {
+                $query->whereDate('assigned_date', $validated['assigned_date'])
+                    ->orWhereJsonContains('days_in_week', Carbon::parse($validated['assigned_date'])->dayOfWeekIso);
+            })
+            ->exists();
+    
+        if ($overlappingschedule) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'This time slot is already taken for the selected room on the same date or day.',
+            ], 409);
+        }
+    
+        // Create the schedule
+        $schedule = Schedule::create([
+            "room_id" => $validated["room_id"],
+            "user_id" => $validated["user_id"],
+            "course_id" => $validated["course_id"],
+            "assigned_date" => $validated["assigned_date"],
+            "end_date" => $validated["end_date"],
+            "start_time" => Carbon::createFromFormat('H:i', $validated["start_time"])->format('H:i'),
+            "end_time" => Carbon::createFromFormat('H:i', $validated["end_time"])->format('H:i'),
+            "days_in_week" => json_encode($validated["days_in_week"]),
+            "year" => $validated["year"],
+            "status" => 1,
+        ]);
+    
+        // Prepare access code if applicable
+        $accessCode = null;
+        $room = Room::find($validated["room_id"]);
+    
+        if ($room && $room->name === 'R404') {
+            $accessCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT); // always 6-digit string
+    
+            Otp_request::create([
+                'room_id' => $validated["room_id"],
+                'user_id' => $validated["user_id"],
+                'Access_code' => $accessCode,
+                'access_status' => 1, // auto-accepted
+                'generated_at' => now(),
+                'used_at' => $validated["start_time"],
+                'end_time' => $validated["end_time"],
+                'purpose' => 'Automatically generated for schedule creation.',
+            ]);
+        }
+    
         LoginHistory::create([
             'user_id' => auth()->id(),
             'username' => auth()->user()->username,
-            'role' => auth()->user()->role_id, 
+            'role' => auth()->user()->role_id,
             'event' => 'schedule',
-            'action' => 'create', 
+            'action' => 'create',
         ]);
     
-        return $this->successResponse($schedule, "Schedule created successfully!", 201);
+        return $this->successResponse([
+            'schedule' => $schedule,
+            'Access_code' => $accessCode ?? null, // will return null if not R404
+        ], "Schedule created successfully!", 201);
     }
     
-
     /**
      * Retrieve all schedules.
      * GET: /api/schedules
      */
     public function index()
     {   
-        $schedules = Schedule::with(['user', 'course', 'room'])->get(); 
+        $schedules = Schedule::with(['user.profile', 'course', 'room'])->get(); 
         return $this->successResponse($schedules, "Schedule retrieved successfully!");
     }
 
@@ -106,32 +156,52 @@ class ScheduleController extends Controller
      * PATCH: /api/schedules/{schedule}
      */
     public function update(Request $request, Schedule $schedule)
-{
-    $validator = Validator::make($request->all(), [
-        "assigned_date" => "sometimes|date",
-        "end_date" => "sometimes|date|after_or_equal:assigned_date",
-        "start_time" => "sometimes|date_format:H:i",
-        "end_time" => "sometimes|date_format:H:i|after:start_time",
-        "year" => "sometimes|string|min:1|max:32",
-        "status" => "sometimes|integer|in:1,2,3" // 1 = Accepted, 2 = Pending, 3 = Cancelled
-    ]);
-
-    if ($validator->fails()) {
-        return $this->errorResponse("Validation failed", $validator->errors(), 400);
-    }
-
-    LoginHistory::create([
-        'user_id' => auth()->id(),
-        'username' => auth()->user()->username,
-        'role' => auth()->user()->role_id, 
-        'event' => 'schedule',
-        'action' => 'update', 
-       ]);
+    {
+        $request->merge([
+            'days_in_week' => is_string($request->days_in_week) ? json_decode($request->days_in_week, true) : $request->days_in_week
+        ]);
     
-    $schedule->update($validator->validated());
-    return $this->successResponse($schedule, "Schedule updated successfully!");
-}
-
+        $validator = Validator::make($request->all(), [
+            "assigned_date" => "sometimes|date",
+            "end_date" => "sometimes|date|after_or_equal:assigned_date",
+            "start_time" => "sometimes|date_format:H:i",
+            "end_time" => "sometimes|date_format:H:i|after:start_time",
+            "days_in_week" => "sometimes|array|min:1",
+            "days_in_week.*" => "integer|min:1|max:7",
+            "year" => "sometimes|string|min:1|max:32",
+            "status" => "sometimes|integer|in:1,2,3", // 1 = Accepted, 2 = Pending, 3 = Cancelled
+            "Access_code" => "sometimes|string|regex:/^\d{6}$/", // Validate access_code
+        ]);
+    
+        if ($validator->fails()) {
+            return $this->errorResponse("Validation failed", $validator->errors(), 400);
+        }
+    
+        $validated = $validator->validated();
+    
+        // Update the schedule
+        $schedule->update($validated);
+    
+        // Update the access_code if provided
+        if (isset($validated['Access_code'])) {
+            Otp_request::where('room_id', $schedule->room_id)
+                ->where('user_id', $schedule->user_id)
+                ->orderBy('created_at', 'desc')
+                ->first()
+                ->update(['Access_code' => $validated['Access_code']]);
+        }
+    
+        // Log the update action
+        LoginHistory::create([
+            'user_id' => auth()->id(),
+            'username' => auth()->user()->username,
+            'role' => auth()->user()->role_id,
+            'event' => 'schedule',
+            'action' => 'update',
+        ]);
+    
+        return $this->successResponse($schedule, "Schedule updated successfully!");
+    }
     
 
     /**
